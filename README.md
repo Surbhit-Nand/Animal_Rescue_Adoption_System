@@ -208,6 +208,53 @@ Press `Ctrl+C` in each terminal to stop the project. Vite updates the frontend
 while you edit. The backend command does not auto-reload; restart it after backend
 changes. Restart the relevant process after editing environment settings.
 
+## Deploy to Fly.io
+
+The deployment files live in the **repository root**, not in `ARA_System`, because
+Fly builds from the root of the git repository:
+
+| File | Purpose |
+|---|---|
+| `Dockerfile` | Builds the frontend, compiles the Express server, and runs one container that serves both from the same origin |
+| `fly.toml` | App name, Sydney region, internal port `8080`, `/health` health check |
+| `.dockerignore` | Keeps `node_modules`, local build output and `.env*` files out of the image |
+
+The API only serves the built frontend when `CLIENT_DIST_DIR` is set, so local
+development still uses the two separate processes described above. In a
+production build the frontend calls its own origin, so the deployment needs no
+`VITE_API_URL` value and no CORS configuration.
+
+```sh
+cd IS314-Computing-Project
+fly launch --no-deploy
+fly deploy
+```
+
+Set the runtime secrets once, and never in `fly.toml`:
+
+```sh
+fly secrets set \
+  CLERK_SECRET_KEY=... \
+  CLERK_WEBHOOK_SIGNING_SECRET=... \
+  DATABASE_URL=... \
+  CLOUDINARY_CLOUD_NAME=... CLOUDINARY_API_KEY=... CLOUDINARY_API_SECRET=... \
+  GEMINI_API_KEY=... \
+  RESEND_API_KEY=... EMAIL_FROM=... \
+  AI_SEARCH_MIN_SIMILARITY=0.60
+```
+
+`VITE_CLERK_PUBLISHABLE_KEY` is different: Vite bakes it into the browser bundle
+at build time, so it is a build argument in `fly.toml` and changing it needs a new
+`fly deploy`, not just a restart. It is a public key, so it is safe to commit.
+
+After the first deploy, add `https://animal-rescue-adoption-system.fly.dev` to
+the Clerk application's allowed origins and redirect URLs, and point the Clerk
+webhook at `https://animal-rescue-adoption-system.fly.dev/api/webhooks`.
+
+Keep database work local: run `npm run db:migrate` from `ARA_System` as described
+above rather than from the deployed container, and never set `DEV_BYPASS_AUTH` or
+run `db:seed:animals` against the deployed app.
+
 ## Useful commands
 
 Run these from `ARA_System`:
@@ -217,6 +264,8 @@ Run these from `ARA_System`:
 | `npm run dev` | Start the frontend development server |
 | `npm run server:dev` | Start the backend API |
 | `npm run server:check` | Check backend TypeScript types |
+| `npm run server:build` | Compile the backend into `server/dist/` |
+| `npm start` | Run the compiled backend (the deployed container's command) |
 | `npm run build` | Type-check and build the frontend into `dist/` |
 | `npm run preview` | Preview the built frontend locally; the API is still separate |
 | `npm run lint` | Run ESLint |
@@ -234,6 +283,7 @@ passed 548 tests, with no failures or skipped tests.
 | Problem | What to check |
 |---|---|
 | `package.json` cannot be found | Run npm commands inside `ARA_System`, not the repository root. |
+| Fly reports `Could not detect runtime or Dockerfile` | Deploy from the repository root, which now contains `Dockerfile` and `fly.toml`; the app itself is inside `ARA_System/`, so the root has no `package.json` to detect. |
 | PowerShell blocks `npm.ps1` | Use `npm.cmd` in place of `npm`, for example `npm.cmd run server:dev`. |
 | Website opens but animals/API requests fail | Start the backend, check `/health`, and confirm `VITE_API_URL` points to its port. |
 | API reports missing Clerk or database configuration | Fill in `server/.env` and check for conflicting values in `.env.local`. |

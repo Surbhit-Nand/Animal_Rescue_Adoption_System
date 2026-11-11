@@ -9,11 +9,9 @@ import type {
   RescueUpdateType,
 } from "../types/rescue";
 
-// Same base URL / dev-server-not-running guard pattern used in
-// animalsApi.ts and ManagerDashboard.tsx - one shared copy for every rescue
-// page.
-const apiBaseUrl = import.meta.env?.VITE_API_URL ?? "http://localhost:8787";
+import { apiBaseUrl } from "./apiClient.js";
 
+// API origin comes from apiClient.ts - one shared copy for every rescue page.
 export const rescueApiBaseUrl = apiBaseUrl;
 
 async function readApiResponse<T>(response: Response): Promise<T> {

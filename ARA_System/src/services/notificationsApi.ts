@@ -1,8 +1,9 @@
 import type { AppNotification, NotificationsInbox } from "../types/notification";
 
+import { apiBaseUrl } from "./apiClient.js";
+
 // Same base URL / dev-server-not-running guard pattern used in
 // adoptionsApi.ts - one shared copy for every notifications reader.
-const apiBaseUrl = import.meta.env.VITE_API_URL ?? "http://localhost:8787";
 
 async function readApiResponse<T>(response: Response): Promise<T> {
   const contentType = response.headers.get("content-type") ?? "";

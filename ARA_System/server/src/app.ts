@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { join, resolve } from "node:path";
 import cors from "cors";
 import express from "express";
 import { env } from "./config/env.js";
@@ -50,5 +52,40 @@ app.use("/api/notifications", notificationsRouter);
 app.use("/api/reports", reportsRouter);
 app.use("/api/veterinary", veterinaryRouter);
 app.use("/api/my-animals", myAnimalsRouter);
+
+// Optional single-origin deployment: serve the built SPA from this Express app
+// when CLIENT_DIST_DIR points at a Vite `dist` folder. Unset locally, so the
+// two-terminal setup (`npm run dev` + `npm run server:dev`) is unchanged and
+// tests are unaffected.
+const clientDistDir = process.env.CLIENT_DIST_DIR
+	? resolve(process.env.CLIENT_DIST_DIR)
+	: undefined;
+
+if (clientDistDir && existsSync(join(clientDistDir, "index.html"))) {
+	// Vite's asset filenames carry a content hash, so they can be cached hard.
+	app.use(
+		"/assets",
+		express.static(join(clientDistDir, "assets"), {
+			immutable: true,
+			maxAge: "1y",
+		}),
+	);
+	app.use(express.static(clientDistDir, { index: false, maxAge: "1h" }));
+	// SPA fallback. The frontend keeps its route in history.state rather than
+	// the URL, so this only ever serves index.html to real GETs that matched
+	// nothing else; API and health paths keep their JSON 404s. Express 5 rejects
+	// the old bare "*" wildcard, hence a middleware instead of app.get.
+	app.use((request, response, next) => {
+		if (request.method !== "GET" && request.method !== "HEAD") {
+			return next();
+		}
+
+		if (request.path === "/health" || request.path.startsWith("/api/")) {
+			return next();
+		}
+
+		response.sendFile(join(clientDistDir, "index.html"));
+	});
+}
 
 app.use(apiErrorHandler);

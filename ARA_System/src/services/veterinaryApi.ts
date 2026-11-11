@@ -2,7 +2,7 @@ import type { MedicalQueueAnimal, MedicalRecord, VeterinaryAppointment, Veterina
 
 import { notifyAccountDataChanged } from "../utils/appointments";
 import type { VeterinaryEmergencyAction, VeterinaryEmergencyResponse } from "../types/veterinary";
-const apiBaseUrl = import.meta.env.VITE_API_URL ?? "http://localhost:8787";
+import { apiBaseUrl } from "./apiClient.js";
 
 async function request<T>(path: string, token: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBaseUrl}/api/veterinary${path}`, {

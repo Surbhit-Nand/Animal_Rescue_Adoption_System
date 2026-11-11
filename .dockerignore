@@ -1,0 +1,18 @@
+# Build context = git repo root. Keep the image small and never let local
+# environment files or a stale Windows build leak in.
+.git
+.gitignore
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+!**/.env.example
+**/.neon
+**/.agents
+**/.vscode
+**/.idea
+**/*.docx
+**/*.log
+ARA_System/docs
+ARA_System/TestCases_Gr7.md
+ARA_System/Adoption.md

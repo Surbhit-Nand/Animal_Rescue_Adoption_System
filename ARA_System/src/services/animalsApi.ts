@@ -1,9 +1,8 @@
 import type { Animal, AnimalPayload } from "../types/animal";
+import { apiBaseUrl } from "./apiClient.js";
 
-// Same base URL / dev-server-not-running guard pattern used in
-// ManagerDashboard.tsx - centralised here so every animals page shares one
-// copy instead of re-implementing it.
-const apiBaseUrl = import.meta.env.VITE_API_URL ?? "http://localhost:8787";
+// API origin comes from apiClient.ts so every animals page shares one copy
+// instead of re-implementing it.
 
 async function readApiResponse<T>(response: Response): Promise<T> {
   const contentType = response.headers.get("content-type") ?? "";

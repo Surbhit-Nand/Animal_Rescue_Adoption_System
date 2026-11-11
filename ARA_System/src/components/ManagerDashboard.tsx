@@ -1,6 +1,7 @@
 import { SignInButton, useAuth, useUser } from "@clerk/react";
 import { useEffect, useState, type FormEvent } from "react";
 import spcaLogo from "../assets/spca-logo.png";
+import { apiBaseUrl } from "../services/apiClient.js";
 import { SiteHeader, type SiteHeaderView } from "./SiteHeader";
 import { SkeletonLoader } from "./SkeletonLoader";
 import { SuccessToast } from "./SuccessToast";
@@ -21,8 +22,6 @@ type PendingInvitation = {
   role: unknown;
   status: "Pending";
 };
-
-const apiBaseUrl = import.meta.env.VITE_API_URL ?? "http://localhost:8787";
 
 // The only list of roles a manager/admin can assign, in dropdown order. Both
 // the invite form and the per-member role editor render from it, so adding a

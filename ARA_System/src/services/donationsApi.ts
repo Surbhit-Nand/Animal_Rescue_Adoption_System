@@ -3,7 +3,7 @@
 // "API not running" HTML responses into a friendly error, and one
 // exported function per backend endpoint.
 
-const apiBaseUrl = import.meta.env.VITE_API_URL ?? "http://localhost:8787";
+import { apiBaseUrl } from "./apiClient.js";
 
 async function readApiResponse<T>(response: Response): Promise<T> {
 	const contentType = response.headers.get("content-type") ?? "";

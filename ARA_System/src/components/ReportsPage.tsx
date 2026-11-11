@@ -16,6 +16,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { apiBaseUrl } from "../services/apiClient.js";
 import { SiteHeader, type SiteHeaderView } from "./SiteHeader";
 import { SkeletonLoader } from "./SkeletonLoader";
 import type {
@@ -25,8 +26,6 @@ import type {
 } from "../types/report";
 
 type ReportsPageProps = { onNavigate: (view: SiteHeaderView) => void };
-
-const apiBaseUrl = import.meta.env.VITE_API_URL ?? "http://localhost:8787";
 
 const RANGE_OPTIONS: { value: ReportRange; label: string }[] = [
   { value: "30d", label: "Last 30 days" },
