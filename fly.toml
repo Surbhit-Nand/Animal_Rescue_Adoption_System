@@ -1,51 +1,37 @@
-# Fly.io config for ARA (Animal Rescue & Adoption Management).
+# fly.toml app configuration file generated for animal-rescue-adoption-system on 2026-11-11T10:36:50Z
 #
-# One machine serves the built SPA *and* the Express API from the same origin,
-# so the browser never makes a cross-origin call and CORS is a no-op. Data stays
-# on Neon (neon-http driver) - there is no Fly Postgres here.
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
-# Run everything from this directory (the git repo root), because the Docker
-# build context is the repo root and the app lives in ARA_System/.
-#
-# Secrets (never in this file) are set once with `fly secrets set`:
-#   CLERK_SECRET_KEY, CLERK_WEBHOOK_SIGNING_SECRET, DATABASE_URL,
-#   CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET,
-#   GEMINI_API_KEY, RESEND_API_KEY, EMAIL_FROM,
-#   AI_SEARCH_MIN_SIMILARITY (0.60 to match the calibrated local value)
 
-app = "animal-rescue-adoption-system"
-primary_region = "syd"
+app = 'animal-rescue-adoption-system'
+primary_region = 'syd'
 
 [build]
-  dockerfile = "Dockerfile"
-  # Vite inlines VITE_* into the bundle at build time. This is the public
-  # publishable key, so committing it is fine - the secret key is a Fly secret.
+  dockerfile = 'Dockerfile'
+
   [build.args]
-    VITE_CLERK_PUBLISHABLE_KEY = "pk_test_Ymxlc3NlZC10YWhyLTU1MjEuY2xlcmsuYWNjb3VudHMuZGV2JA"
+    VITE_CLERK_PUBLISHABLE_KEY = 'pk_test_Ymxlc3NlZC10YWhyLTU1MjEuY2xlcmsuYWNjb3VudHMuZGV2JA'
 
 [env]
-  NODE_ENV = "production"
-  # Must equal [http_service].internal_port below.
-  API_PORT = "8080"
-  # `new URL(env.clientOrigin)` runs at boot, so this has to be a real origin.
-  CLIENT_ORIGIN = "https://animal-rescue-adoption-system.fly.dev"
-  # Opts app.ts into serving the built SPA + history fallback. Unset locally.
-  CLIENT_DIST_DIR = "/app/dist"
+  API_PORT = '8080'
+  CLIENT_DIST_DIR = '/app/dist'
+  CLIENT_ORIGIN = 'https://animal-rescue-adoption-system.fly.dev'
+  NODE_ENV = 'production'
 
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = "suspend"
+  auto_stop_machines = 'suspend'
   auto_start_machines = true
   min_machines_running = 1
 
   [[http_service.checks]]
-    grace_period = "20s"
-    interval = "30s"
-    method = "GET"
-    path = "/health"
-    timeout = "5s"
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '20s'
+    method = 'GET'
+    path = '/health'
 
 [[vm]]
-  size = "shared-cpu-1x"
-  memory = "512mb"
+  size = 'shared-cpu-1x'
+  memory = '512mb'
