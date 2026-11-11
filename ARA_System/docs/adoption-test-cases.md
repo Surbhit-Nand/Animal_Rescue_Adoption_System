@@ -3,24 +3,27 @@
 > **Status:** Implemented and passing.
 > **Module:** Adoption Application & Rescue Reporting, adoption half.
 > **System:** ARA — Animal Rescue & Adoption Management System, SPCA Fiji (Group 7, IS314 Computing Project).
-> **Date:** 2026-10-19
+> **Date:** 2026-10-19 (gift-recipient cases added 2026-11-11)
 
 ## Summary
 
 | Item                    | Value                                                                    |
 | ----------------------- | ------------------------------------------------------------------------ |
-| Backend suite           | `server/src/modules/adoptions/adoptions.service.test.ts` (46 cases)      |
-| HTTP-layer suite        | `server/src/modules/adoptions/adoptions.validation.test.ts` (32 cases)   |
+| Backend suite           | `server/src/modules/adoptions/adoptions.service.test.ts` (49 cases)      |
+| HTTP-layer suite        | `server/src/modules/adoptions/adoptions.validation.test.ts` (37 cases)   |
 | Repository suite        | `server/src/modules/adoptions/adoptions.repository.test.ts` (3 cases)    |
 | Frontend queue suite    | `src/features/adoptions/adoptionQueue.test.ts` (3 cases)                 |
 | Applicant-labels suite  | `src/types/adoption.test.ts` (3 cases)                                   |
-| Total test cases        | **87**                                                                   |
+| Total test cases        | **95**                                                                   |
 | Runner                  | `node --import tsx --experimental-test-module-mocks --test` (via `npm test`) |
 | Environment             | Node v24.21.0, tsx, no database / Clerk / mail provider required          |
-| Where tested            | Local development workstation, branch `main` @ `8493fb2`                  |
-| Date of run             | 2026-10-19, 15:17 (Fiji Standard Time, UTC+12)                           |
-| Verified result         | **87 tests, 13 suites, 87 pass, 0 fail**                                 |
-| Whole suite at that commit | **465 tests, 57 suites, 465 pass, 0 fail**                            |
+| Where tested            | Local development workstation, branch `main` (uncommitted gift-recipient change) |
+| Date of run             | 2026-11-11 (Fiji Standard Time, UTC+12)                                  |
+| Verified result         | **95 tests, 13 suites, 95 pass, 0 fail**                                 |
+| Previous run (2026-10-19) | **87 tests, 13 suites, 87 pass, 0 fail** at commit `8493fb2`; whole suite at that commit **465 tests, 57 suites, 465 pass, 0 fail** |
+
+The 2026-11-11 run adds the seven gift-recipient cases (AD-88 to AD-94) and
+picks up one service case that the 2026-10-19 revision had not yet counted.
 
 The suites divide the module by layer: `adoptions.service.ts` (business
 rules, with every collaborator stubbed), `adoptions.routes.ts` (the zod request
@@ -75,7 +78,9 @@ are picked up automatically. To run only the adoption cases:
 node --import tsx --experimental-test-module-mocks --test `
   server/src/modules/adoptions/adoptions.service.test.ts `
   server/src/modules/adoptions/adoptions.validation.test.ts `
-  src/features/adoptions/adoptionQueue.test.ts
+  server/src/modules/adoptions/adoptions.repository.test.ts `
+  src/features/adoptions/adoptionQueue.test.ts `
+  src/types/adoption.test.ts
 ```
 
 ## Test strategy
@@ -323,6 +328,35 @@ lifecycle status — it reads as a cancellation — while staff queues keep the
 > copy in `notifications.service.ts` and `services/email.ts` was also missing, so
 > it fell through to the generic "moved to withdrawn" text.
 
+## Test cases — Gift adoption recipient (added 2026-11-11)
+
+The self/gift choice used to sit on the final Review step and record nothing
+about the recipient. It is now the **first** step of the wizard ("Who is this
+for?"), and the answer changes the rest of the application:
+
+- **For myself** keeps the existing questionnaire unchanged.
+- **For someone else** adds an "About the recipient" page straight after "About
+  you", and the Identification, Home, Pet experience and Care plan pages are
+  reframed as the recipient's (the animal will live with them). The applicant's
+  own details are still captured as the person giving the animal.
+
+A gift application must name the person receiving the animal (name, contact
+number and relationship) so the review team can confirm that person is ready
+for a pet. The three fields are stored in nullable `recipient_name` /
+`recipient_contact` / `recipient_relationship` columns (migration
+`0029_adoption_gift_recipient.sql`), and both the route schema and the service
+refuse to attach recipient details to a self adoption.
+
+| ID    | Test case                                                          | Rule under test                                                        | Preconditions / input                                                                                       | Expected result                                                                                              | Actual | Status |
+| ----- | ------------------------------------------------------------------ | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------ | ------ |
+| AD-88 | Stores the gift recipient on submit                                | A gift application records who the animal is for                       | Animal exists; no active application; `createAdoptionApplication` captures the payload; `adoptionFor: "gift"` + name, contact, relationship | Stored row has `adoptionFor: "gift"`, `recipientName: "Losana Naidu"`, `recipientContact: "+679 9900002"`, `recipientRelationship: "friend"` | As expected | Pass |
+| AD-89 | Does not store recipient details on a self adoption                | Recipient columns belong only to gift applications                     | Same stubs, but `adoptionFor: "self"` with recipient details still supplied                                  | Stored row has `recipientName`, `recipientContact` and `recipientRelationship` all `null`                     | As expected | Pass |
+| AD-90 | Accepts a gift application when the recipient details are present  | The happy path for a gift application parses                           | `adoptionFor: "gift"` + name, contact, `relationship: "friend"` over a valid adult application              | `safeParse().success` is `true`                                                                              | As expected | Pass |
+| AD-91 | Requires the recipient name for a gift adoption                    | The recipient must be identifiable                                     | `adoptionFor: "gift"` with contact and relationship but no name                                              | `"Tell us the full name of the person receiving the animal"`                                                  | As expected | Pass |
+| AD-92 | Requires the recipient contact for a gift adoption                 | The review team must be able to reach the recipient                    | `adoptionFor: "gift"` with name and relationship but no contact                                              | `"Tell us the recipient's contact number"`                                                                    | As expected | Pass |
+| AD-93 | Requires the recipient relationship for a gift adoption            | The recipient's relationship to the applicant must be stated           | `adoptionFor: "gift"` with name and contact but no relationship                                              | `"Choose the recipient's relationship to you"`                                                                | As expected | Pass |
+| AD-94 | Rejects recipient details on a self adoption                       | Recipient fields are gift-only (no silent acceptance)                  | `adoptionFor: "self"` + `recipientName`                                                                      | `"Recipient details are only needed for gift adoptions"`                                                      | As expected | Pass |
+
 ## Status transition matrix
 
 The matrix the suite enforces (`ALLOWED_TRANSITIONS` in `adoptions.service.ts`).
@@ -356,6 +390,11 @@ because the repository typechecks them under two different TypeScript projects
 (`server/tsconfig.json` with `rootDir: "src"`, and `tsconfig.app.json`), and
 merging them into one physical file would move test code outside a project root
 and break `npm run server:check` and `npm run build`.
+
+> **Appendix A is the 2026-10-19 listing.** It does not include the gift-recipient
+> cases added on 2026-11-11 (AD-88 to AD-94) or the unrelated service case that
+> revision had not yet counted; the runnable files under `server/src/modules/adoptions/`
+> are the source of truth.
 
 ```ts
 // ===== server/src/modules/adoptions/adoptions.service.test.ts =====
@@ -1682,6 +1721,7 @@ describe("applicant closure wording", () => {
 | Audit trail for submissions and status changes                                  | AD-22, AD-25, AD-36, AD-42     |
 | Notifications on stage change (best-effort)                                     | AD-18, AD-19, AD-20, AD-37, AD-38, AD-83, AD-84 |
 | Applicant privacy: applicants only see their own applications                   | AD-03                          |
+| Gift adoptions record the recipient (name, contact, relationship), self adoptions never do | AD-88 to AD-94        |
 | Staff queue Active/History split                                                | AD-77 to AD-79                 |
 | Request validation is enforced before the service sees the payload              | AD-45 to AD-70                 |
 
@@ -1708,9 +1748,10 @@ Everything else is new coverage: `AD-04` (empty applicant history shortcut),
 refusal), `AD-41` (animal-write compensation), `AD-42` to `AD-44` (withdrawal),
 `AD-80` to `AD-82` (the duplicate-application SQL), `AD-83` to `AD-84`
 (withdrawal notification) and `AD-85` to `AD-87` (applicant status wording),
-and the whole `AD-45` to `AD-76` validation block.
+and the whole `AD-45` to `AD-76` validation block. The 2026-11-11 revision adds
+`AD-88` to `AD-94` for the gift-adoption recipient.
 
-### Known gaps (not covered by these 87 cases)
+### Known gaps (not covered by these 95 cases)
 
 - `adoptions.routes.ts` — the **HTTP** behaviour itself (status codes on the
   wire, the RBAC middleware chain, multipart ID upload) is still not unit-tested;
@@ -1728,7 +1769,12 @@ and the whole `AD-45` to `AD-76` validation block.
   tests; the pure helpers are covered instead: `adoptionQueue.ts` (AD-77 to
   AD-79) and the applicant status wording in `src/types/adoption.ts` (AD-85 to
   AD-87). The components that render those labels are still only exercised
-  manually.
+  manually. This includes the new "Who is this for?" and "About the recipient"
+  wizard pages: the branching step list, the conditional name/contact/
+  relationship fields, the reframed gift copy, the step-level `pageError`
+  messages and the payload spread for gift applications are verified only by
+  the route/service cases above (AD-88 to AD-94) and by manual use, not by a
+  component test.
 - Notification content (email/in-app body text) is asserted by recipient and
   status only, not by rendered copy — so the `withdrawn` copy added with AD-83
   is tested for existence, not for exact wording.

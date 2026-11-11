@@ -46,6 +46,9 @@ export type SubmitAdoptionApplicationInput = Pick<
 	| "nextOfKinName"
 	| "nextOfKinContact"
 	| "adoptionFor"
+	| "recipientName"
+	| "recipientContact"
+	| "recipientRelationship"
 >;
 
 // The adopted lifecycle for an application: submitted -> under_review
@@ -208,6 +211,13 @@ export async function submitAdoptionApplication(
 		nextOfKinContact: input.nextOfKinContact,
 		adoptionMotivation: null,
 		adoptionFor: input.adoptionFor,
+		// Recipient details belong only to a gift adoption. Zod already rejects
+		// them on a self application; nulling them here keeps the rule true even
+		// when the service is called directly.
+		recipientName: input.adoptionFor === "gift" ? (input.recipientName ?? null) : null,
+		recipientContact: input.adoptionFor === "gift" ? (input.recipientContact ?? null) : null,
+		recipientRelationship:
+			input.adoptionFor === "gift" ? (input.recipientRelationship ?? null) : null,
 		consentHomeVisit: false,
 		agreeReturnToSpca: false,
 		confirmAccurate: false,

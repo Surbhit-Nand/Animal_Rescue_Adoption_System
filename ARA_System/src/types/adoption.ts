@@ -82,6 +82,10 @@ export type AdoptionApplication = {
   // Section 5: who the adoption is for (+ household agreement, the
   // self-declared household check backed by the home-visit consent).
   adoptionFor: "self" | "gift" | null;
+  // Gift recipient details (null for self adoptions and legacy rows).
+  recipientName: string | null;
+  recipientContact: string | null;
+  recipientRelationship: "family" | "friend" | "other" | null;
   householdAgreement: "yes" | "no" | null;
   // Section 6: acknowledgements.
   consentHomeVisit: boolean;
@@ -119,6 +123,9 @@ export type AdoptionApplicationInput = {
   nextOfKinName: string;
   nextOfKinContact: string;
   adoptionFor: "self" | "gift";
+  recipientName?: string;
+  recipientContact?: string;
+  recipientRelationship?: "family" | "friend" | "other";
 };
 
 // The forward path shown to applicants as a stepper. Rejection is a branch

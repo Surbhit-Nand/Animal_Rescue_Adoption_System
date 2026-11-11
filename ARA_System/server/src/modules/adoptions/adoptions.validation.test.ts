@@ -201,6 +201,58 @@ describe("applicationSchema", () => {
 		const message = firstMessage(validApplication({ hasCurrentPets: "yes" }));
 		assert.equal(message, "Tell us about your current pets");
 	});
+
+	it("accepts a gift application when the recipient details are present", () => {
+		const parsed = applicationSchema.safeParse(
+			validApplication({
+				adoptionFor: "gift",
+				recipientName: "Losana Naidu",
+				recipientContact: "+679 9900002",
+				recipientRelationship: "friend",
+			}),
+		);
+		assert.equal(parsed.success, true, JSON.stringify(parsed));
+	});
+
+	it("requires the recipient name for a gift adoption", () => {
+		const message = firstMessage(
+			validApplication({
+				adoptionFor: "gift",
+				recipientContact: "+679 9900002",
+				recipientRelationship: "friend",
+			}),
+		);
+		assert.equal(message, "Tell us the full name of the person receiving the animal");
+	});
+
+	it("requires the recipient contact for a gift adoption", () => {
+		const message = firstMessage(
+			validApplication({
+				adoptionFor: "gift",
+				recipientName: "Losana Naidu",
+				recipientRelationship: "friend",
+			}),
+		);
+		assert.equal(message, "Tell us the recipient's contact number");
+	});
+
+	it("requires the recipient relationship for a gift adoption", () => {
+		const message = firstMessage(
+			validApplication({
+				adoptionFor: "gift",
+				recipientName: "Losana Naidu",
+				recipientContact: "+679 9900002",
+			}),
+		);
+		assert.equal(message, "Choose the recipient's relationship to you");
+	});
+
+	it("rejects recipient details on a self adoption", () => {
+		const message = firstMessage(
+			validApplication({ adoptionFor: "self", recipientName: "Losana Naidu" }),
+		);
+		assert.equal(message, "Recipient details are only needed for gift adoptions");
+	});
 });
 
 describe("transitionSchema", () => {

@@ -70,11 +70,17 @@ export const applicationSchema = z
 		nextOfKinContact: z.string().trim().min(1, "Tell us your next of kin's contact number"),
 		// Section 5: who the adoption is for.
 		adoptionFor: z.enum(["self", "gift"], "Choose who this adoption is for"),
+		// Gift recipient details, required only when adoptionFor is "gift".
+		// They let the review team confirm the recipient is ready for a pet.
+		recipientName: optionalText,
+		recipientContact: optionalText,
+		recipientRelationship: z.enum(["family", "friend", "other"]).optional(),
 	})
 	// Conditional fields: minors must supply all four guardian answers (and
 	// adults must not send any); past pets require the outcome; current pets
-	// require their details. The cat/asthma health gate lives in the service,
-	// which is the layer that knows the animal's species.
+	// require their details; gift adoptions require the recipient details. The
+	// cat/asthma health gate lives in the service, which is the layer that
+	// knows the animal's species.
 	.superRefine((data, ctx) => {
 		const required = (path: (keyof typeof data)[], message: string) => {
 			ctx.addIssue({ code: "custom", path: path as string[], message });
@@ -108,6 +114,22 @@ export const applicationSchema = z
 		}
 		if (data.hasCurrentPets === "yes" && !data.currentPetsDetails) {
 			required(["currentPetsDetails"], "Tell us about your current pets");
+		}
+		// A gift adoption is for someone else, so the review team needs to know
+		// who that is. Self adoptions must not carry recipient details - the
+		// same "only for the case that needs them" rule as guardian details.
+		if (data.adoptionFor === "gift") {
+			if (!data.recipientName) {
+				required(["recipientName"], "Tell us the full name of the person receiving the animal");
+			}
+			if (!data.recipientContact) {
+				required(["recipientContact"], "Tell us the recipient's contact number");
+			}
+			if (!data.recipientRelationship) {
+				required(["recipientRelationship"], "Choose the recipient's relationship to you");
+			}
+		} else if (data.recipientName ?? data.recipientContact ?? data.recipientRelationship) {
+			required(["recipientName"], "Recipient details are only needed for gift adoptions");
 		}
 	});
 

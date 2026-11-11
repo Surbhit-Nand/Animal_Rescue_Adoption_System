@@ -491,7 +491,11 @@ export function ManageAdoptionApplications({ onNavigate }: ManageAdoptionApplica
                       {isGiftAdoption(application) && (
                         <span
                           className="adoption-clearance-badge"
-                          title="This adoption is a gift for someone else - confirm the recipient is ready for a pet."
+                          title={`This adoption is a gift${
+                            application.recipientName
+                              ? ` for ${application.recipientName}`
+                              : " for someone else"
+                          } - confirm the recipient is ready for a pet.`}
                         >
                           Gift - extra review
                         </span>

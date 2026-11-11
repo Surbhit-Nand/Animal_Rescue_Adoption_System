@@ -51,6 +51,10 @@ type FormState = {
   nextOfKinCode: string;
   nextOfKinContact: string;
   adoptionFor: "" | "self" | "gift";
+  recipientName: string;
+  recipientCode: string;
+  recipientContact: string;
+  recipientRelationship: "" | "family" | "friend" | "other";
 };
 
 const emptyForm: FormState = {
@@ -77,25 +81,35 @@ const emptyForm: FormState = {
   nextOfKinCode: DEFAULT_DIAL_CODE,
   nextOfKinContact: "",
   adoptionFor: "",
+  recipientName: "",
+  recipientCode: DEFAULT_DIAL_CODE,
+  recipientContact: "",
+  recipientRelationship: "",
 };
 
-// One screen of the wizard. The guardian step only exists for minors, so the
-// visible step list is derived from the applicant's age bracket.
-type StepId = "applicant" | "guardian" | "identification" | "household" | "experience" | "care" | "review";
+// One screen of the wizard. The choice of self vs gift comes first, and it
+// decides which later pages exist: a gift application adds an "About the
+// recipient" page, and the guardian page only exists for minors.
+type StepId = "intent" | "applicant" | "guardian" | "identification" | "household" | "experience" | "care" | "recipient" | "review";
 
 const STEP_TITLES: Record<StepId, string> = {
+  intent: "Who is this for?",
   applicant: "About you",
   guardian: "Parent or guardian",
   identification: "Identification",
-  household: "Your home",
+  household: "Home",
   experience: "Pet experience",
   care: "Care plan",
+  recipient: "About the recipient",
   review: "Review & submit",
 };
 
 function visibleSteps(form: FormState): StepId[] {
-  const steps: StepId[] = ["applicant"];
+  const steps: StepId[] = ["intent", "applicant"];
   if (form.ageBracket === "minor") steps.push("guardian");
+  // A gift application is about the person receiving the animal, so it needs
+  // its own recipient page straight after the applicant's details.
+  if (form.adoptionFor === "gift") steps.push("recipient");
   steps.push("identification", "household", "experience", "care", "review");
   return steps;
 }
@@ -174,6 +188,26 @@ function reviewSummary(form: FormState): AnswerSection[] {
         { label: "Next of kin contact", value: phone(form.nextOfKinCode, form.nextOfKinContact) },
       ],
     },
+    {
+      title: "5. Adoption recipient",
+      rows: [
+        {
+          label: "Adoption for",
+          value: answerLabel("adoptionFor", form.adoptionFor) ?? "Not provided",
+        },
+        ...(form.adoptionFor === "gift"
+          ? [
+              { label: "Recipient name", value: text(form.recipientName) },
+              { label: "Recipient contact", value: phone(form.recipientCode, form.recipientContact) },
+              {
+                label: "Recipient relationship",
+                value:
+                  answerLabel("recipientRelationship", form.recipientRelationship) ?? "Not provided",
+              },
+            ]
+          : []),
+      ],
+    },
   ];
 }
 
@@ -228,6 +262,9 @@ export function AdoptionApplicationForm({
   // further) and again server-side, which is the layer that enforces it.
   function pageError(page: StepId): string | null {
     switch (page) {
+      case "intent":
+        if (!form.adoptionFor) return "Choose who this adoption is for.";
+        return null;
       case "applicant":
         if (!form.fullName.trim()) return "Tell us your full name.";
         if (!isValidPhoneNational(form.contactNumber, form.contactCode)) {
@@ -249,38 +286,79 @@ export function AdoptionApplicationForm({
         if (!form.guardianConsent) return "Your parent or guardian must consent to this adoption.";
         return null;
       case "identification":
-        if (!form.idDocumentType) return "Choose your identification document type.";
-        if (!form.idDocumentUrl) return "Upload a photo of your identification document.";
+        if (!form.idDocumentType) {
+          return form.adoptionFor === "gift"
+            ? "Choose the recipient's identification document type."
+            : "Choose your identification document type.";
+        }
+        if (!form.idDocumentUrl) {
+          return form.adoptionFor === "gift"
+            ? "Upload a photo of the recipient's identification document."
+            : "Upload a photo of your identification document.";
+        }
         return null;
       case "household":
-        if (!form.petAllergies) return "Tell us whether anyone has pet allergies.";
+        if (!form.petAllergies) {
+          return form.adoptionFor === "gift"
+            ? "Tell us whether anyone in the recipient's household has pet allergies."
+            : "Tell us whether anyone has pet allergies.";
+        }
         if (!form.respiratoryIssues) return "Tell us about asthma or respiratory conditions.";
         if (animal?.type === "cat" && form.respiratoryIssues === "yes") {
-          return "Applicants with asthma or a respiratory condition cannot adopt cats, for health and safety. Our team can suggest a dog, rabbit or other pet instead.";
+          return form.adoptionFor === "gift"
+            ? "The recipient has asthma or a respiratory condition, so they cannot adopt cats, for health and safety. Our team can suggest a dog, rabbit or other pet instead."
+            : "Applicants with asthma or a respiratory condition cannot adopt cats, for health and safety. Our team can suggest a dog, rabbit or other pet instead.";
         }
         return null;
       case "experience":
-        if (!form.ownedPetsBefore) return "Tell us whether you have owned pets before.";
-        if (form.ownedPetsBefore === "yes" && !form.previousPetOutcome.trim()) {
-          return "Tell us what happened to your previous pet(s).";
+        if (!form.ownedPetsBefore) {
+          return form.adoptionFor === "gift"
+            ? "Tell us whether the recipient has owned pets before."
+            : "Tell us whether you have owned pets before.";
         }
-        if (!form.hasCurrentPets) return "Tell us whether you currently have other pets.";
+        if (form.ownedPetsBefore === "yes" && !form.previousPetOutcome.trim()) {
+          return form.adoptionFor === "gift"
+            ? "Tell us what happened to the recipient's previous pet(s)."
+            : "Tell us what happened to your previous pet(s).";
+        }
+        if (!form.hasCurrentPets) {
+          return form.adoptionFor === "gift"
+            ? "Tell us whether the recipient currently has other pets."
+            : "Tell us whether you currently have other pets.";
+        }
         if (form.hasCurrentPets === "yes" && !form.currentPetsDetails.trim()) {
-          return "Tell us about your current pets.";
+          return form.adoptionFor === "gift"
+            ? "Tell us about the recipient's current pets."
+            : "Tell us about your current pets.";
         }
         return null;
       case "care":
-        if (!form.vetCostPlan.trim()) return "Tell us how you will cover veterinary costs.";
+        if (!form.vetCostPlan.trim()) {
+          return form.adoptionFor === "gift"
+            ? "Tell us how the recipient will cover veterinary costs."
+            : "Tell us how you will cover veterinary costs.";
+        }
         if (!form.nextOfKinName.trim()) {
-          return "Tell us who looks after the animal when you are unavailable.";
+          return form.adoptionFor === "gift"
+            ? "Tell us who looks after the animal when the recipient is unavailable."
+            : "Tell us who looks after the animal when you are unavailable.";
         }
         if (!isValidPhoneNational(form.nextOfKinContact, form.nextOfKinCode)) {
           const band = dialCodeByCode(form.nextOfKinCode);
           return `Enter a valid ${band.name} next-of-kin number (${expectedLengthLabel(form.nextOfKinCode)}).`;
         }
         return null;
+      case "recipient":
+        if (!form.recipientName.trim()) {
+          return "Tell us the full name of the person receiving the animal.";
+        }
+        if (!isValidPhoneNational(form.recipientContact, form.recipientCode)) {
+          const band = dialCodeByCode(form.recipientCode);
+          return `Enter a valid ${band.name} recipient number (${expectedLengthLabel(form.recipientCode)}).`;
+        }
+        if (!form.recipientRelationship) return "Choose the recipient's relationship to you.";
+        return null;
       case "review":
-        if (!form.adoptionFor) return "Choose who this adoption is for.";
         return null;
     }
   }
@@ -354,6 +432,16 @@ export function AdoptionApplicationForm({
       if (!form.ownedPetsBefore || !form.hasCurrentPets || !form.adoptionFor) {
         throw new Error("Answer every required question before submitting.");
       }
+      if (
+        form.adoptionFor === "gift" &&
+        (!form.recipientName.trim() ||
+          !form.recipientContact.trim() ||
+          !form.recipientRelationship)
+      ) {
+        throw new Error(
+          "Add the recipient's name, contact number and relationship before submitting.",
+        );
+      }
       await submitAdoptionApplication(
         {
           animalId: animal.id,
@@ -381,6 +469,13 @@ export function AdoptionApplicationForm({
           nextOfKinName: form.nextOfKinName.trim(),
           nextOfKinContact: formatPhone(form.nextOfKinCode, form.nextOfKinContact),
           adoptionFor: form.adoptionFor,
+          ...(form.adoptionFor === "gift"
+            ? {
+                recipientName: form.recipientName.trim(),
+                recipientContact: formatPhone(form.recipientCode, form.recipientContact),
+                recipientRelationship: form.recipientRelationship as "family" | "friend" | "other",
+              }
+            : {}),
         },
         token,
       );
@@ -523,7 +618,7 @@ export function AdoptionApplicationForm({
               ))}
             </ol>
 
-            {errorMessage && !(step === "review" && errorMessage === "Choose who this adoption is for.") && (
+            {errorMessage && (
               <p className="invite-feedback error" role="alert">
                 {errorMessage}
               </p>
@@ -531,9 +626,55 @@ export function AdoptionApplicationForm({
 
             <form className="animal-form rescue-form" onSubmit={(event) => void handleSubmit(event)}>
               <div className="animal-form-grid">
+                {step === "intent" && (
+                  <>
+                    <h3 className="animal-form-full form-section-title">Who is this adoption for?</h3>
+                    <p className="animal-form-full security-note">
+                      Choose this first. A gift application asks about the person
+                      receiving the animal, not about you.
+                    </p>
+                    <fieldset className="radio-group animal-form-full adoption-recipient">
+                      <legend className="form-label-text">Is this adoption for yourself or someone else?</legend>
+                      <label className="radio-option">
+                        <input
+                          type="radio"
+                          name="adoptionFor"
+                          value="self"
+                          checked={form.adoptionFor === "self"}
+                          onChange={() => { setField("adoptionFor", "self"); setErrorMessage(""); }}
+                        />
+                        <span><strong>For myself</strong><small>I will be responsible for their care.</small></span>
+                      </label>
+                      <label className="radio-option">
+                        <input
+                          type="radio"
+                          name="adoptionFor"
+                          value="gift"
+                          checked={form.adoptionFor === "gift"}
+                          onChange={() => { setField("adoptionFor", "gift"); setErrorMessage(""); }}
+                        />
+                        <span><strong>For someone else</strong><small>Our team will confirm the recipient is ready.</small></span>
+                      </label>
+                    </fieldset>
+                    {form.adoptionFor === "gift" && (
+                      <p className="animal-form-full security-note adoption-recipient-note">
+                        Gift applications ask for the recipient&apos;s details and
+                        about the recipient&apos;s home, pet experience and care
+                        plan. Every gift adoption gets an extra review.
+                      </p>
+                    )}
+                  </>
+                )}
+
                 {step === "applicant" && (
                   <>
                     <h3 className="animal-form-full form-section-title">About you</h3>
+                    {form.adoptionFor === "gift" && (
+                      <p className="animal-form-full security-note">
+                        This page is about you, the person giving the animal. The
+                        next page asks about the recipient.
+                      </p>
+                    )}
                     <label>
                       <span className="form-label-text">Full name</span>
                       <input
@@ -642,12 +783,13 @@ export function AdoptionApplicationForm({
 
                 {step === "identification" && (
                   <>
-                    <h3 className="animal-form-full form-section-title">Identification</h3>
+                    <h3 className="animal-form-full form-section-title">
+                      {form.adoptionFor === "gift" ? "Recipient identification" : "Identification"}
+                    </h3>
                     <p className="animal-form-full security-note">
-                      Upload a photo of your voter ID card, passport,
-                      driver&apos;s licence, or another photo ID so our team can
-                      verify who is applying. Our staff review every document -
-                      uploading never blocks your application.
+                      {form.adoptionFor === "gift"
+                        ? "Upload a photo of the recipient's voter ID card, passport, driver's licence, or another photo ID so our team can verify them. Our staff review every document - uploading never blocks the application."
+                        : "Upload a photo of your voter ID card, passport, driver's licence, or another photo ID so our team can verify who is applying. Our staff review every document - uploading never blocks your application."}
                     </p>
                     <label>
                       <span className="form-label-text">Document type</span>
@@ -691,9 +833,15 @@ export function AdoptionApplicationForm({
 
                 {step === "household" && (
                   <>
-                    <h3 className="animal-form-full form-section-title">Your home</h3>
+                    <h3 className="animal-form-full form-section-title">
+                      {form.adoptionFor === "gift" ? "The recipient's home" : "Your home"}
+                    </h3>
                     <fieldset className="radio-group">
-                      <legend className="form-label-text">Pet allergies in the household?</legend>
+                      <legend className="form-label-text">
+                        {form.adoptionFor === "gift"
+                          ? "Pet allergies in the recipient's household?"
+                          : "Pet allergies in the household?"}
+                      </legend>
                       <label className="radio-option">
                         <input
                           type="radio"
@@ -717,7 +865,9 @@ export function AdoptionApplicationForm({
                     </fieldset>
                     <fieldset className="radio-group animal-form-full">
                       <legend className="form-label-text">
-                        Do you have asthma or a respiratory condition?
+                        {form.adoptionFor === "gift"
+                          ? "Does the recipient have asthma or a respiratory condition?"
+                          : "Do you have asthma or a respiratory condition?"}
                       </legend>
                       <label className="radio-option">
                         <input
@@ -742,9 +892,9 @@ export function AdoptionApplicationForm({
                     </fieldset>
                     {animal.type === "cat" && (
                       <p className="animal-form-full security-note">
-                        {animal.name} is a cat: applicants with asthma or a
-                        respiratory condition cannot adopt cats, for health and
-                        safety. Our team can suggest a dog, rabbit or other pet.
+                        {form.adoptionFor === "gift"
+                          ? `${animal.name} is a cat: recipients with asthma or a respiratory condition cannot adopt cats, for health and safety. Our team can suggest a dog, rabbit or other pet.`
+                          : `${animal.name} is a cat: applicants with asthma or a respiratory condition cannot adopt cats, for health and safety. Our team can suggest a dog, rabbit or other pet.`}
                       </p>
                     )}
                   </>
@@ -752,9 +902,15 @@ export function AdoptionApplicationForm({
 
                 {step === "experience" && (
                   <>
-                    <h3 className="animal-form-full form-section-title">Pet experience</h3>
+                    <h3 className="animal-form-full form-section-title">
+                      {form.adoptionFor === "gift" ? "The recipient's pet experience" : "Pet experience"}
+                    </h3>
                     <fieldset className="radio-group">
-                      <legend className="form-label-text">Have you owned pets before?</legend>
+                      <legend className="form-label-text">
+                        {form.adoptionFor === "gift"
+                          ? "Has the recipient owned pets before?"
+                          : "Have you owned pets before?"}
+                      </legend>
                       <label className="radio-option">
                         <input
                           type="radio"
@@ -778,7 +934,11 @@ export function AdoptionApplicationForm({
                     </fieldset>
                     {form.ownedPetsBefore === "yes" && (
                       <label className="animal-form-full">
-                        <span className="form-label-text">What happened to your previous pet(s)?</span>
+                        <span className="form-label-text">
+                          {form.adoptionFor === "gift"
+                            ? "What happened to the recipient's previous pet(s)?"
+                            : "What happened to your previous pet(s)?"}
+                        </span>
                         <textarea
                           rows={3}
                           placeholder="e.g. lived with us for 12 years until old age"
@@ -788,7 +948,11 @@ export function AdoptionApplicationForm({
                       </label>
                     )}
                     <fieldset className="radio-group">
-                      <legend className="form-label-text">Do you currently have other pets?</legend>
+                      <legend className="form-label-text">
+                        {form.adoptionFor === "gift"
+                          ? "Does the recipient currently have other pets?"
+                          : "Do you currently have other pets?"}
+                      </legend>
                       <label className="radio-option">
                         <input
                           type="radio"
@@ -826,9 +990,15 @@ export function AdoptionApplicationForm({
 
                 {step === "care" && (
                   <>
-                    <h3 className="animal-form-full form-section-title">Care plan</h3>
+                    <h3 className="animal-form-full form-section-title">
+                      {form.adoptionFor === "gift" ? "The recipient's care plan" : "Care plan"}
+                    </h3>
                     <label className="animal-form-full">
-                      <span className="form-label-text">How will you cover veterinary costs and emergencies?</span>
+                      <span className="form-label-text">
+                        {form.adoptionFor === "gift"
+                          ? "How will the recipient cover veterinary costs and emergencies?"
+                          : "How will you cover veterinary costs and emergencies?"}
+                      </span>
                       <textarea
                         rows={3}
                         placeholder="Savings, pet insurance, family support..."
@@ -840,7 +1010,11 @@ export function AdoptionApplicationForm({
                       <span className="form-label-text">Next of kin full name</span>
                       <input
                         type="text"
-                        placeholder="Who looks after the animal when you are unavailable?"
+                        placeholder={
+                          form.adoptionFor === "gift"
+                            ? "Who looks after the animal when the recipient is unavailable?"
+                            : "Who looks after the animal when you are unavailable?"
+                        }
                         value={form.nextOfKinName}
                         onChange={(event) => setField("nextOfKinName", event.target.value)}
                       />
@@ -855,6 +1029,50 @@ export function AdoptionApplicationForm({
                   </>
                 )}
 
+                {step === "recipient" && (
+                  <>
+                    <h3 className="animal-form-full form-section-title">About the recipient</h3>
+                    <p className="animal-form-full security-note">
+                      {animal.name} will live with this person, so we need their
+                      details here and, on the next pages, about their home, pet
+                      experience and care plan.
+                    </p>
+                    <label>
+                      <span className="form-label-text">Recipient full name</span>
+                      <input
+                        type="text"
+                        placeholder="e.g. Losana Naidu"
+                        value={form.recipientName}
+                        onChange={(event) => setField("recipientName", event.target.value)}
+                      />
+                    </label>
+                    <PhoneInput
+                      label="Recipient contact number"
+                      code={form.recipientCode}
+                      number={form.recipientContact}
+                      onCodeChange={(code) => setField("recipientCode", code)}
+                      onNumberChange={(value) => setField("recipientContact", value)}
+                    />
+                    <label>
+                      <span className="form-label-text">Recipient&apos;s relationship to you</span>
+                      <select
+                        value={form.recipientRelationship}
+                        onChange={(event) =>
+                          setField(
+                            "recipientRelationship",
+                            event.target.value as FormState["recipientRelationship"],
+                          )
+                        }
+                      >
+                        <option value="">Choose...</option>
+                        <option value="family">Family member</option>
+                        <option value="friend">Friend</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </label>
+                  </>
+                )}
+
                 {step === "review" && (
                   <>
                     <div className="animal-form-full adoption-review-heading">
@@ -862,38 +1080,6 @@ export function AdoptionApplicationForm({
                       <h3>Review your application</h3>
                       <p>Check your details before sending your application to adopt {animal.name}. You can return to any completed step to make changes.</p>
                     </div>
-                    <fieldset className="radio-group animal-form-full adoption-recipient" aria-describedby={errorMessage === "Choose who this adoption is for." ? "adoption-recipient-error" : undefined}>
-                      <legend className="form-label-text">Is this adoption for yourself or someone else?</legend>
-                      <label className="radio-option">
-                        <input
-                          type="radio"
-                          name="adoptionFor"
-                          value="self"
-                          checked={form.adoptionFor === "self"}
-                          onChange={() => { setField("adoptionFor", "self"); setErrorMessage(""); }}
-                        />
-                        <span><strong>For myself</strong><small>I will be responsible for their care.</small></span>
-                      </label>
-                      <label className="radio-option">
-                        <input
-                          type="radio"
-                          name="adoptionFor"
-                          value="gift"
-                          checked={form.adoptionFor === "gift"}
-                          onChange={() => { setField("adoptionFor", "gift"); setErrorMessage(""); }}
-                        />
-                        <span><strong>For someone else</strong><small>Our team will confirm the recipient is ready.</small></span>
-                      </label>
-                      {errorMessage === "Choose who this adoption is for." && (
-                        <p id="adoption-recipient-error" className="invite-feedback error" role="alert">{errorMessage}</p>
-                      )}
-                    </fieldset>
-                    {form.adoptionFor === "gift" && (
-                      <p className="animal-form-full security-note adoption-recipient-note">
-                        Gift adoptions get an extra review step - our team will
-                        confirm the recipient is ready for a pet.
-                      </p>
-                    )}
                     <div className="animal-form-full adoption-review-summary">
                       <div className="adoption-review-summary-heading"><h4>Application details</h4><span>Review before submitting</span></div>
                       <div className="adoption-review-sections">

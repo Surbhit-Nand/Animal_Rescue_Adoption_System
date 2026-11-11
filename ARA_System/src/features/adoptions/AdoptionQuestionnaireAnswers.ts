@@ -21,6 +21,11 @@ const ADOPTION_FOR_LABEL: Record<string, string> = {
   self: "Themselves",
   gift: "Gift for someone else (extra review)",
 };
+const RECIPIENT_RELATIONSHIP_LABEL: Record<string, string> = {
+  family: "Family member",
+  friend: "Friend",
+  other: "Other",
+};
 
 function codeLabel(value: string | null, map: Record<string, string>): string | null {
   if (!value) return null;
@@ -30,7 +35,12 @@ function codeLabel(value: string | null, map: Record<string, string>): string | 
 // Human labels for the questionnaire answer codes, reused by the applicant
 // wizard's review summary so its wording matches the staff/queue views.
 export function answerLabel(
-  field: "ageBracket" | "idDocumentType" | "guardianRelationship" | "adoptionFor",
+  field:
+    | "ageBracket"
+    | "idDocumentType"
+    | "guardianRelationship"
+    | "adoptionFor"
+    | "recipientRelationship",
   value: string | null,
 ): string | null {
   const maps = {
@@ -38,6 +48,7 @@ export function answerLabel(
     idDocumentType: ID_DOCUMENT_LABEL,
     guardianRelationship: GUARDIAN_RELATIONSHIP_LABEL,
     adoptionFor: ADOPTION_FOR_LABEL,
+    recipientRelationship: RECIPIENT_RELATIONSHIP_LABEL,
   };
   return codeLabel(value, maps[field]);
 }
@@ -139,6 +150,18 @@ export function questionnaireSections(application: AdoptionApplication): AnswerS
       title: "5. Adoption for",
       rows: [
         { label: "Adoption for", value: codeLabel(application.adoptionFor, ADOPTION_FOR_LABEL) ?? "Not provided" },
+        ...(application.adoptionFor === "gift"
+          ? [
+              { label: "Recipient name", value: application.recipientName ?? "Not provided" },
+              { label: "Recipient contact", value: application.recipientContact ?? "Not provided" },
+              {
+                label: "Recipient relationship",
+                value:
+                  codeLabel(application.recipientRelationship, RECIPIENT_RELATIONSHIP_LABEL) ??
+                  "Not provided",
+              },
+            ]
+          : []),
       ],
     },
   ];

@@ -380,6 +380,12 @@ export const adoptionApplications = pgTable(
 		// questionnaire; its column stays for existing rows.
 		adoptionMotivation: text("adoption_motivation"),
 		adoptionFor: text("adoption_for"),
+		// Gift adoptions (adoption_for = 'gift') name who the animal is for, so
+		// the review team can confirm the recipient is ready for a pet. Null
+		// for self adoptions and for rows submitted before this field existed.
+		recipientName: text("recipient_name"),
+		recipientContact: text("recipient_contact"),
+		recipientRelationship: text("recipient_relationship"),
 		householdAgreement: text("household_agreement"),
 		// Acknowledgements are no longer collected (SPCA Fiji has no capacity
 		// for home visits); the columns stay for existing rows and default

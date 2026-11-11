@@ -484,6 +484,57 @@ describe("adoptions.service", () => {
 			assert.equal(stored.nextOfKinContact, "+679 9900001");
 		});
 
+		it("stores the gift recipient on submit", async () => {
+			repo("getAnimalById", async () => baseAnimal());
+			repo("findActiveAdoptionApplication", async () => undefined);
+			let stored: Record<string, unknown> = {};
+			repo("createAdoptionApplication", async (data: Record<string, unknown>) => {
+				stored = data;
+				return { id: APPLICATION_ID, ...data };
+			});
+
+			await submitAdoptionApplication(
+				{
+					...input,
+					adoptionFor: "gift",
+					recipientName: "Losana Naidu",
+					recipientContact: "+679 9900002",
+					recipientRelationship: "friend",
+				},
+				APPLICANT_ID,
+			);
+
+			assert.equal(stored.adoptionFor, "gift");
+			assert.equal(stored.recipientName, "Losana Naidu");
+			assert.equal(stored.recipientContact, "+679 9900002");
+			assert.equal(stored.recipientRelationship, "friend");
+		});
+
+		it("does not store recipient details on a self adoption", async () => {
+			repo("getAnimalById", async () => baseAnimal());
+			repo("findActiveAdoptionApplication", async () => undefined);
+			let stored: Record<string, unknown> = {};
+			repo("createAdoptionApplication", async (data: Record<string, unknown>) => {
+				stored = data;
+				return { id: APPLICATION_ID, ...data };
+			});
+
+			await submitAdoptionApplication(
+				{
+					...input,
+					adoptionFor: "self",
+					recipientName: "Losana Naidu",
+					recipientContact: "+679 9900002",
+					recipientRelationship: "friend",
+				},
+				APPLICANT_ID,
+			);
+
+			assert.equal(stored.recipientName, null);
+			assert.equal(stored.recipientContact, null);
+			assert.equal(stored.recipientRelationship, null);
+		});
+
 		it("uploads an ID photo through the injected uploader", async () => {
 			const seen: Buffer[] = [];
 			const url = await uploadAdoptionIdDocument(Buffer.from("fake-image"), async (file) => {
